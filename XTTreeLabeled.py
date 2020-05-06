@@ -33,7 +33,7 @@ def XTTreeLabeled(imarisId):
     cellsTrackIds = cells.GetTrackIds()  # TrackID cell form Statistic->Selection
     cellTrackEdges = cells.GetTrackEdges()
 
-    # Connection between TrackID and adges. Special definitions in function GetTrackIds.
+    # Connection between TrackID and edges. Special definitions in function GetTrackIds.
     edges = np.column_stack((cellTrackEdges, cellsTrackIds))
     dataExtracted = extractUniqueData(edges)
     dataExtracted = np.column_stack((cellsIds, dataExtracted))  # Define array with CellID, TrackID, Egdes.
@@ -51,7 +51,6 @@ def XTTreeLabeled(imarisId):
     # uniqueSpecificName = np.transpose(np.unique(np.array(statistics.mNames)))
     generations = data[np.where(data[:, 1] == 'Generation')]
     timeIndex = data[np.where(data[:, 1] == 'Time Index')]
-    numberOfSpotsPerTimePoint = data[np.where(data[:, 1] == 'Number of Spots per Time Point')]
 
     dataExtracted = np.array([[15, 100015],
                               [24, 100024],
@@ -88,8 +87,10 @@ def XTTreeLabeled(imarisId):
                           ['95', 'ok', 4],
                           ['96', 'ok', 4]
                           ])
-    # Create table with CellId, TrackID, Generations, Time point, Number of Spots per Time Point
+    # Create table with CellId, TrackID, Generations, Time point
     table = prepareTableWithData(dataExtracted, generations, timeIndex)
+    res = np.array(table)
+
     createUniqueLabels(table)
 
     res = np.array(table)
@@ -114,7 +115,7 @@ def prepareTableWithData(dataExtracted, generations, timeIndex):
     table = []
     for i in range(len(dataExtracted)):
         if dataExtracted[i, 0] == int(generations[i, 0]) and dataExtracted[i, 0] == int(timeIndex[i, 0]):
-            table.append([dataExtracted[i, 0], dataExtracted[i, 1], generations[i, 2], timeIndex[i, 2], None, None])
+            table.append([dataExtracted[i, 0], dataExtracted[i, 1], int(float(generations[i, 2])), int(float(timeIndex[i, 2])), None, None])
     return table
 
 
@@ -138,15 +139,42 @@ def createUniqueLabels(table):
                 prevIterationCells = [l for l in previousIteration if int(l[1]) == cell[1]]
                 cells = [l for l in currentSliceCells if int(l[1]) == cell[1]]
                 if len(prevIterationCells) < len(cells):
+                     #Przypadek gdy na poprzednim slajsie jest mniejsza ilość komórek niż na obecnym. (Podział komórek)
                     try:
                         label
                     except NameError:
                         label = 1
                     else:
                         label += 1
-                    cell[4] = prevIterationCells[0][4] + '_' + str(label)
+                    try:
+                        cell[4] = prevIterationCells[0][4] + '_' + str(label)
+                    except IndexError:
+                        cell[4] = str(label)
+                    except TypeError:
+                        tmp = []
+                        for i in range(timeSlice):
+                            tmp.append(table[timeSlice - i])
+                        for labeledCell in tmp:
+                            if labeledCell[1] == cell[1] and not labeledCell[5] in [item[-1] for item in
+                                                                                    currentSliceCells]:
+                                cell[4] = labeledCell[4]
+                                break
                     cell[5] = label
+                elif len(prevIterationCells) > len(cells) and not hasCellDivided:
+                     #Ilość obecnych komórek jest mniejsza niż na poprzednim slajsie. I nie nastąpił ich podział.
+                     #wycinek glównej table timeSlice do 0
+                     #i szukać wiersza w którym table[row,1] == cell[1]
+                    #w 5 kolumnie musi być unikalna wartośc dla tego wycinku czasowego
+                    tmp = []
+                    for i in range(timeSlice):
+                        tmp.append(table[timeSlice - i])
+                    for labeledCell in tmp:
+                        if labeledCell[1] == cell[1] and not labeledCell[5] in [item[-1] for item in currentSliceCells]:
+                            cell[4] = labeledCell[4]
+                            cell[5] = labeledCell[5]
+                            break
                 elif len(prevIterationCells) == len(cells) and hasCellDivided:
+                    #Nastąpił podział komórek, ale któraś musiała umrzeć.
                     try:
                         label
                     except NameError:
@@ -157,16 +185,33 @@ def createUniqueLabels(table):
                     cell[4] = prevCell[4]
                     cell[5] = prevCell[5]
                 elif hasCellDivided:
+                    #Tylko nastąpił podział komórek, nie sprawdzamy liczebności poprzedniej i tej.
                     try:
                         label
                     except NameError:
                         label = 1
                     else:
                         label += 1
-                    cell[4] = prevIterationCells[0][4] + '_' + str(label)
+                    try:
+                        cell[4] = prevIterationCells[0][4] + '_' + str(label)
+                    except TypeError:
+                        tmp = []
+                        for i in range(timeSlice):
+                            tmp.append(table[timeSlice - i])
+                        for labeledCell in tmp:
+                            if labeledCell[1] == cell[1] and not labeledCell[5] in [item[-1] for item in
+                                                                                    currentSliceCells]:
+                                cell[4] = labeledCell[4]
+                                break
                     cell[5] = label
                 else:
+                    #Stan komórek bez zmian
                     cell[4] = prevIterationCells[0][4]
                     cell[5] = prevIterationCells[0][5]
-            del label
+            try:
+                del label
+            except NameError:
+                pass
+            except IndexError:
+                pass
         previousIteration = currentSliceCells
