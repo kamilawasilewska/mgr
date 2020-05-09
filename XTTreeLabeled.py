@@ -131,8 +131,7 @@ def createUniqueLabels(table):
 
 def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
     for labeledCell in prevIterationSameLabelCells:
-        if not [labeledCell[1], labeledCell[5]] in [[item[1], item[-1]] for item in
-                                                    thisIterationSameLabelCells]:
+        if not [labeledCell[1], labeledCell[5]] in [[item[1], item[-1]] for item in thisIterationSameLabelCells]:
             cell[4] = labeledCell[4]
             cell[5] = labeledCell[5]
             break
