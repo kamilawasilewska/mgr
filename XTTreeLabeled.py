@@ -9,8 +9,6 @@
 
 import ImarisLib
 import numpy as np
-from collections import Counter
-from tkinter import *
 
 
 def XTTreeLabeled(imarisId):
@@ -47,6 +45,7 @@ def XTTreeLabeled(imarisId):
 
     createUniqueLabels(table)
     res = np.array(table)
+    a = 1
 
 
 def extractUniqueData(edges):
@@ -89,47 +88,172 @@ def createUniqueLabels(table):
     for timeSlice in range(int(max(table, key=lambda x: x[3])[3])):
         imarisTimeSlice = timeSlice + 1
         currentSliceCells = [l for l in table if int(l[3]) == imarisTimeSlice]
+        currentSliceCells = sorted(currentSliceCells, key=lambda x: x[2])
         if imarisTimeSlice == 1:
-            label = 1
-            for cell in currentSliceCells:
-                cell[4] = str(label)
-                cell[5] = 1
-                label += 1
-        else:
-            for cell in currentSliceCells:
-                thisIterationSameLabelCells = [l for l in currentSliceCells if int(l[1]) == cell[1]]
-                prevIterationSameLabelCells = [l for l in previousIteration if int(l[1]) == cell[1]]
-                if len(prevIterationSameLabelCells) < len(thisIterationSameLabelCells):
-                    rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
-                    if cell[4] is None:
-                        try:
-                            label
-                        except NameError:
-                            label = 1
-                        try:
-                            cell[4] = prevIterationSameLabelCells[0][4] + '_' + str(label)
-                        except TypeError:
-                            tmp = []
-                            slice_length = len([l for l in table if l[3] < imarisTimeSlice]) - 1
-                            for i in range(slice_length):
-                                tmp.append(table[slice_length - i])
-                            for labeledCell in tmp:
-                                if not labeledCell[5] in [item[-1] for item in thisIterationSameLabelCells]:
-                                    cell[4] = prevIterationSameLabelCells[0][4] + '_' + label
-                                    break
-                        del tmp, slice_length
-                        cell[5] = label
-                        label += 1
-                elif len(prevIterationSameLabelCells) >= len(thisIterationSameLabelCells):
-                    rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
-            try:
-                del label
-            except NameError:
-                print('no label to delete')
+            initializeLabels(currentSliceCells)
+            previousIteration = currentSliceCells
+            continue
+        for cell in currentSliceCells:
+            thisIterationSameLabelCells = [l for l in currentSliceCells if int(l[1]) == cell[1]]
+            prevIterationSameLabelCells = [l for l in previousIteration if int(l[1]) == cell[1]]
+            if len(prevIterationSameLabelCells) >= len(thisIterationSameLabelCells):
+                rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table)
+            elif len(prevIterationSameLabelCells) < len(thisIterationSameLabelCells):
+                rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table)
+                try:
+                    labeledCells
+                except NameError:
+                    labeledCells = 0
+                try:
+                    usedLabels
+                except NameError:
+                    usedLabels = []
+                try:
+                    label
+                except NameError:
+                    label = 1
+                label, labeledCells, usedLabels = createNewLabel(
+                    cell,
+                    imarisTimeSlice,
+                    prevIterationSameLabelCells,
+                    previousIteration,
+                    table,
+                    thisIterationSameLabelCells,
+                    label,
+                    labeledCells,
+                    usedLabels
+                )
+        try:
+            del label, labeledCells, usedLabels
+        except NameError:
+            pass
         previousIteration = currentSliceCells
 
 
-def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
+def createNewLabel(
+        cell,
+        imarisTimeSlice,
+        prevIterationSameLabelCells,
+        previousIteration,
+        table,
+        thisIterationSameLabelCells,
+        label,
+        labeledCells,
+        usedLabels
+):
+    if not cell[1] in [cell[1] for cell in previousIteration]:
+        labeledCells = findLabeledCellInGeneralTable(
+            cell,
+            imarisTimeSlice,
+            labeledCells,
+            table,
+            thisIterationSameLabelCells
+        )
+    else:
+        if label is None or label > 2:
+            label = 1
+        prevIterationCell = getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
+        createLabel(cell, prevIterationCell, label, usedLabels)
+        cell[5] = labeledCells
+        labeledCells += 1
+        label += 1
+
+    return label, labeledCells, usedLabels
+
+
+def getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
+    if len(prevIterationSameLabelCells) == 1:
+        prevIterationCell = prevIterationSameLabelCells[0]
+    else:
+        prevIterationCell = [item for item in prevIterationSameLabelCells if
+                             [item[1], item[2]] == [cell[1], cell[2]]]
+    if not prevIterationCell:
+        prevIterationCell = findParentCell(
+            prevIterationCell,
+            prevIterationSameLabelCells,
+            thisIterationSameLabelCells
+        )
+    elif len(prevIterationCell) > 1:
+        for prev in prevIterationCell:
+            if not isinstance(prev, list):
+                break
+            if len(prev[4].split('_')) - 1 == cell[2]:
+                prevIterationCell = prev
+                break
+    return prevIterationCell
+
+
+def findLabeledCellInGeneralTable(cell, imarisTimeSlice, labeledCells, table, thisIterationSameLabelCells):
+    tmp = allPreviouslyLabeledCells(imarisTimeSlice, table)
+    for labeledCell in tmp:
+        if labeledCell[1] == cell[1] and not labeledCell[5] in [item[-1] for item in
+                                                                thisIterationSameLabelCells]:
+            cell[4] = labeledCell[4]
+            cell[5] = labeledCells
+            labeledCells += 1
+            break
+    del tmp
+    return labeledCells
+
+
+def findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIterationSameLabelCells):
+    for thisIterationCell in thisIterationSameLabelCells:
+        for prev in prevIterationSameLabelCells:
+            if prev[2] != thisIterationCell[2] and prev[4] not in [e[4] for e in thisIterationSameLabelCells]:
+                prevIterationCell = prev
+                break
+        if prevIterationCell:
+            break
+    if not prevIterationCell:
+        for parentCell in prevIterationSameLabelCells:
+            if len([e[2] for e in thisIterationSameLabelCells if e[4] == parentCell[4]]) > 1:
+                continue
+
+            prevIterationCell = parentCell
+            break
+    return prevIterationCell
+
+
+def createLabel(cell, prevIterationCell, label, usedLabels):
+    if any(isinstance(i, list) for i in prevIterationCell):
+        prevIterationCell = prevIterationCell[0]
+    newLabel = prevIterationCell[4]
+    if len(str(newLabel).split('_')) - 1 < cell[2]:
+        newLabel += '_'
+        newLabel += str(label)
+        label += 1
+        usedLabels.append(prevIterationCell[4])
+    cell[4] = newLabel
+    return label
+
+
+def initializeLabels(currentSliceCells):
+    label = 1
+    for cell in currentSliceCells:
+        cell[4] = str(label)
+        cell[5] = True
+        label += 1
+    return label
+
+
+def allPreviouslyLabeledCells(imarisTimeSlice, table):
+    tmp = []
+    slice_length = len([l for l in table if l[3] < imarisTimeSlice]) - 1
+    for i in range(slice_length):
+        tmp.append(table[slice_length - i])
+    return tmp
+
+
+def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table):
+    if len(prevIterationSameLabelCells) != len(thisIterationSameLabelCells) and \
+            [cell[0], cell[1], cell[2], cell[3]] not in [
+        [
+            element[0],
+            element[1],
+            element[2],
+            element[3]
+        ] for element in allPreviouslyLabeledCells(cell[3], table)]:
+        return
     for labeledCell in prevIterationSameLabelCells:
         if not [labeledCell[1], labeledCell[5]] in [[item[1], item[-1]] for item in thisIterationSameLabelCells]:
             cell[4] = labeledCell[4]
