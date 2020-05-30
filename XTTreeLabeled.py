@@ -47,6 +47,17 @@ def XTTreeLabeled(imarisId):
     res = np.array(table)
     a = 1
 
+    new_names = ['Tree Labeled'] * len(table)  # aName
+    new_values = [element[2] for element in table]  # aValue
+    new_units = [''] * len(table)  # aUnits
+    new_ids = cellsIds
+    new_factor_names = ['Category', 'TreeLabeled']  # aFactorNames
+    new_factors = [['Spot'] * len(table), [element[4] for element in table]]  # aFactor
+    currentElement = imarisApp.GetSurpassSelection()
+
+    currentElement.RemoveStatistics(new_names)
+    currentElement.AddStatistics(new_names, new_values, new_units, new_factors, new_factor_names, new_ids)
+
 
 def extractUniqueData(edges):
     dataExtracted = list()
