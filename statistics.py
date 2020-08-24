@@ -32,7 +32,7 @@ cellsWithIntensityByTime: dict = {}
 cellGenerations: dict = {}
 allCells: dict = {}
 for cellLabel in cellLabels:
-    cellsWithIntensityByTime[cellLabel] = {l[0]: [l[2], l[1]] for l in imarisParsedData if l[3] == cellLabel}
+    cellsWithIntensityByTime[cellLabel] = {entry[0]: [entry[2], entry[1]] for entry in imarisParsedData if entry[3] == cellLabel}
     allCells[cellLabel] = [[cell[2], cell[1]] for cell in imarisParsedData if cell[3] == cellLabel]
     labelAsArray: imarisParsedData = cellLabel.split('_')
     if len(labelAsArray) == 1 or labelAsArray[-1] != '1':
@@ -58,7 +58,7 @@ for cellLabel in cellLabels:
 dividingCellLabels: list = list(cellGenerations.keys())
 allValues: list = []
 for dividingCellLabel in dividingCellLabels:
-    tmp = [[l[2], l[1]] for l in imarisParsedData if l[3] == dividingCellLabel]
+    tmp = [[dataRow[2], dataRow[1]] for dataRow in imarisParsedData if dataRow[3] == dividingCellLabel]
     timeSlice = [item[0] for item in allValues]
     for i in tmp:
         if not i[0] in timeSlice:
