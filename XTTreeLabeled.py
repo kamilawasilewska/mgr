@@ -1,4 +1,3 @@
-#
 #    <CustomTools>
 #      <Menu>
 #       <Item name="XTTreeLabeled" icon="Python">
@@ -45,7 +44,6 @@ def XTTreeLabeled(imarisId):
 
     createUniqueLabels(table)
     res = np.array(table)
-    a = 1
 
     new_names = ['Tree Labeled'] * len(table)  # aName
     new_values = [element[2] for element in table]  # aValue
