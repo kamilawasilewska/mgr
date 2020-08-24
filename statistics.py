@@ -108,10 +108,11 @@ for data in allCells.items():
         y.append(unused[idx][0][1])
         idx += 1
 for i in range(len(ids)):
+    plot.scatter(x[i], y[i])
     plot.text(x[i], y[i], ids[i])
 
 plot.title('Wykres zmian świecenia w czasie (wszystkie komórki)')
-ax.set_ylabel('wartość świecenia')
-ax.set_xlabel('czas (slice)')
+plot.ylabel('wartość świecenia')
+plot.xlabel('czas (slice)')
 plot.legend(legend)
 plot.show()
