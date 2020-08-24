@@ -32,7 +32,8 @@ cellsWithIntensityByTime: dict = {}
 cellGenerations: dict = {}
 allCells: dict = {}
 for cellLabel in cellLabels:
-    cellsWithIntensityByTime[cellLabel] = {entry[0]: [entry[2], entry[1]] for entry in imarisParsedData if entry[3] == cellLabel}
+    cellsWithIntensityByTime[cellLabel] = {entry[0]: [entry[2], entry[1]] for entry in imarisParsedData if
+                                           entry[3] == cellLabel}
     allCells[cellLabel] = [[cell[2], cell[1]] for cell in imarisParsedData if cell[3] == cellLabel]
     labelAsArray: imarisParsedData = cellLabel.split('_')
     if len(labelAsArray) == 1 or labelAsArray[-1] != '1':
@@ -93,12 +94,21 @@ for i in range(len(cellID)):
 plot.show()
 
 legend: list = []
+x: list = []
+y: list = []
+ids: list = []
+cellIds, unused = zip(*list(allCells.items()))
+idx = 0
 for data in allCells.items():
     plot.plot([item[0] for item in data[1]], [item[1] for item in data[1]])
     legend.append('Cell: ' + data[0])
-
-for i in range(len(cellID)):
-    plot.text(x[i], y[i], cellID[i])
+    if not data[0] in ids:
+        ids.append(cellIds[idx])
+        x.append(unused[idx][0][0])
+        y.append(unused[idx][0][1])
+        idx += 1
+for i in range(len(ids)):
+    plot.text(x[i], y[i], ids[i])
 
 plot.title('Wykres zmian świecenia w czasie (wszystkie komórki)')
 ax.set_ylabel('wartość świecenia')
