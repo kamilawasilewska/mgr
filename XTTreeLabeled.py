@@ -17,9 +17,6 @@ def XTTreeLabeled(imarisId):
     # Get an imaris object with id aImarisId
     imarisApp = imarisLib.GetApplication(imarisId)
 
-    # Get the currently loaded dataset
-    currentImage = imarisApp.GetImage(0)
-
     # Get Cell data from Imaris
     cells = imarisApp.GetFactory().ToSpots(imarisApp.GetSurpassSelection())  # Works only for Spots mode
 
@@ -34,16 +31,17 @@ def XTTreeLabeled(imarisId):
 
     # Get statistics from Imaris
     statistics = cells.GetStatistics()
-    # uniqueSpecificName = np.transpose(np.unique(np.array(statistics.mNames)))
+    uniqueSpecificName = np.transpose(np.unique(np.array(statistics.mNames)))
     data = np.column_stack((statistics.mIds, statistics.mNames, statistics.mValues))
     generations = data[np.where(data[:, 1] == 'Generation')]
     timeIndex = data[np.where(data[:, 1] == 'Time Index')]
+    timeSincePreviousDivision = data[np.where(data[:, 1] == 'Time Since Previous Division')]
 
     # Create table with CellId, TrackID, Generations, Time point
-    table = prepareTableWithData(dataExtracted, generations, timeIndex)
+    table = prepareTableWithData(dataExtracted, generations, timeIndex, timeSincePreviousDivision)
 
     createUniqueLabels(table)
-    res = np.array(table)
+    new_table = np.array(table)
 
     new_names = ['Tree Labeled'] * len(table)  # aName
     new_values = [element[2] for element in table]  # aValue
@@ -69,9 +67,9 @@ def extractUniqueData(edges):
     return dataExtracted
 
 
-def prepareTableWithData(dataExtracted, generations, timeIndex):
+def prepareTableWithData(dataExtracted, generations, timeIndex, timeSincePreviousDivision):
     """
-   :return [...[CellId, TrackID, Generations, TimePoint, LabelPlaceholder, CellGenerationIndex]]
+   :return [...[CellId, TrackID, Generations, TimePoint, LabelPlaceholder, CellGenerationIndex, CellIdOfNewBornCell]]
     """
     table = []
     for i in range(len(dataExtracted)):
@@ -83,9 +81,23 @@ def prepareTableWithData(dataExtracted, generations, timeIndex):
                     int(float(generations[i, 2])),
                     int(float(timeIndex[i, 2])),
                     None,
+                    None,
                     None
                 ]
             )
+
+    cellsAfterDivision = []
+    for i in range(len(timeSincePreviousDivision)):
+        if timeSincePreviousDivision[i, 2] == '1.0':
+            cellsAfterDivision.append([timeSincePreviousDivision[i, 0]])
+
+    for j in range(len(table)):
+        for i in range(len(cellsAfterDivision)):
+            if int(cellsAfterDivision[i][0]) == table[j][0]:
+                table[j][-1] = 1
+                break
+            else:
+                table[j][-1] = 0
     return table
 
 
@@ -95,6 +107,7 @@ def createUniqueLabels(table):
    :return void
     """
     for timeSlice in range(int(max(table, key=lambda x: x[3])[3])):
+        # timeSlice = 46 dubluje label
         imarisTimeSlice = timeSlice + 1
         currentSliceCells = [l for l in table if int(l[3]) == imarisTimeSlice]
         currentSliceCells = sorted(currentSliceCells, key=lambda x: x[2])
@@ -174,8 +187,11 @@ def getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells
     if len(prevIterationSameLabelCells) == 1:
         prevIterationCell = prevIterationSameLabelCells[0]
     else:
+        # item[2] to generations na tej podstawie szukamy rodzicow
         prevIterationCell = [item for item in prevIterationSameLabelCells if
                              [item[1], item[2]] == [cell[1], cell[2]]]
+
+    # [2163, 1000000014, 3, 63, None, None]
     if not prevIterationCell:
         prevIterationCell = findParentCell(
             prevIterationCell,
@@ -186,6 +202,7 @@ def getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells
         for prev in prevIterationCell:
             if not isinstance(prev, list):
                 break
+            #     i tu tez generations
             if len(prev[4].split('_')) - 1 == cell[2]:
                 prevIterationCell = prev
                 break
@@ -208,6 +225,7 @@ def findLabeledCellInGeneralTable(cell, imarisTimeSlice, labeledCells, table, th
 def findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIterationSameLabelCells):
     for thisIterationCell in thisIterationSameLabelCells:
         for prev in prevIterationSameLabelCells:
+            # i tu tez generacja
             if prev[2] != thisIterationCell[2] and prev[4] not in [e[4] for e in thisIterationSameLabelCells]:
                 prevIterationCell = prev
                 break
@@ -215,6 +233,7 @@ def findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIteration
             break
     if not prevIterationCell:
         for parentCell in prevIterationSameLabelCells:
+            # i tu generacja
             if len([e[2] for e in thisIterationSameLabelCells if e[4] == parentCell[4]]) > 1:
                 continue
 
@@ -226,6 +245,8 @@ def findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIteration
 def createLabel(cell, prevIterationCell, label, usedLabels):
     if any(isinstance(i, list) for i in prevIterationCell):
         prevIterationCell = prevIterationCell[0]
+    #     [2163, 1000000014, 3, 63, None, None]
+
     newLabel = prevIterationCell[4]
     if len(str(newLabel).split('_')) - 1 < cell[2]:
         newLabel += '_'
@@ -268,3 +289,6 @@ def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabe
             cell[4] = labeledCell[4]
             cell[5] = labeledCell[5]
             break
+
+
+XTTreeLabeled(0)
