@@ -10,7 +10,6 @@ import ImarisLib
 import numpy as np
 
 CELL_LABEL_DELIMITER = '_'
-
 CELL_ID = 0
 CELL_LINE_NUMBER = 1
 CELL_GENERATIONS = 2
@@ -41,7 +40,6 @@ def XTTreeLabeled(imarisId):
 
     # Get statistics from Imaris
     statistics = cells.GetStatistics()
-    uniqueSpecificName = np.transpose(np.unique(np.array(statistics.mNames)))
     data = np.column_stack((statistics.mIds, statistics.mNames, statistics.mValues))
     generations = data[np.where(data[:, 1] == 'Generation')]
     timeIndex = data[np.where(data[:, 1] == 'Time Index')]
@@ -51,7 +49,6 @@ def XTTreeLabeled(imarisId):
     table = prepareTableWithData(dataExtracted, generations, timeIndex, timeSincePreviousDivision)
 
     createUniqueLabels(table)
-    new_table = np.array(table)
 
     new_names = ['Tree Labeled'] * len(table)  # aName
     new_values = [element[CELL_GENERATIONS] for element in table]  # aValue
@@ -118,25 +115,28 @@ def createUniqueLabels(table):
     """
     for timeSlice in range(int(max(table, key=lambda x: x[CELL_TIME_SLICE])[CELL_TIME_SLICE])):
         imarisTimeSlice = timeSlice + 1
-        currentSliceCells = [l for l in table if int(l[CELL_TIME_SLICE]) == imarisTimeSlice]
+        currentSliceCells = [cell for cell in table if int(cell[CELL_TIME_SLICE]) == imarisTimeSlice]
         currentSliceCells = sorted(currentSliceCells, key=lambda x: x[CELL_GENERATIONS])
         if imarisTimeSlice == 1:
             initializeLabels(currentSliceCells)
             previousIteration = currentSliceCells
             continue
         for cell in currentSliceCells:
-            thisIterationSameLabelCells = [l for l in currentSliceCells if int(l[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
-            prevIterationSameLabelCells = [l for l in previousIteration if int(l[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
+            thisIterationSameLabelCells = [cell for cell in currentSliceCells if int(cell[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
+            # noinspection PyUnboundLocalVariable
+            prevIterationSameLabelCells = [cell for cell in previousIteration if int(cell[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
 
             rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table)
             if not (cell[CELL_LABEL] is None or cell[CELLS_LABELED_TOTAL] is None):
                 continue
 
             try:
+                # noinspection PyUnboundLocalVariable
                 labeledCells
             except NameError:
                 labeledCells = 0
             try:
+                # noinspection PyUnboundLocalVariable
                 label
             except NameError:
                 label = 1
@@ -191,8 +191,7 @@ def rewriteFromAllLabeledCells(cell, imarisTimeSlice, labeledCells, table, thisI
     for labeledCell in tmp:
         if labeledCell[CELL_LINE_NUMBER] == cell[CELL_LINE_NUMBER] \
                 and labeledCell[CELL_GENERATIONS] == cell[CELL_GENERATIONS] \
-                and not labeledCell[CELL_LABEL] in [item[CELL_LABEL] for item in thisIterationSameLabelCells] \
-                :
+                and not labeledCell[CELL_LABEL] in [item[CELL_LABEL] for item in thisIterationSameLabelCells]:
             cell[CELL_LABEL] = labeledCell[CELL_LABEL]
             cell[CELLS_LABELED_TOTAL] = labeledCells
             labeledCells += 1
@@ -240,7 +239,7 @@ def initializeLabels(currentSliceCells):
 
 def allPreviouslyLabeledCells(imarisTimeSlice, table):
     tmp = []
-    slice_length = len([l for l in table if l[CELL_TIME_SLICE] < imarisTimeSlice]) - 1
+    slice_length = len([cell for cell in table if cell[CELL_TIME_SLICE] < imarisTimeSlice]) - 1
     for i in range(slice_length):
         tmp.append(table[slice_length - i])
     return tmp
