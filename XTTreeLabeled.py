@@ -1,7 +1,7 @@
 #    <CustomTools>
 #      <Menu>
 #       <Item name="XTTreeLabeled" icon="Python">
-#         <Command>PythonXT::XT()</Command>
+#         <Command>Python3XT::XTTreeLabeled(%i)</Command>
 #       </Item>
 #      </Menu>
 #    </CustomTools>
@@ -258,6 +258,3 @@ def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabe
             cell[CELL_LABEL] = labeledCell[CELL_LABEL]
             cell[CELLS_LABELED_TOTAL] = labeledCell[CELLS_LABELED_TOTAL]
             break
-
-
-XTTreeLabeled(0)
