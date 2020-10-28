@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
 
-path = "C:\\Users\\Kamila\\Documents\\005 FITC_C_A-80_Statistics"
+# path = "C:\\Users\\Kamila\\Documents\\005 FITC_C_A-80_Statistics"
+path = "C:\\Users\\Kamila\\Documents\\005 FITC_C_A_all_slice_Statistics"
 arr: list = os.listdir(path)
 
 
@@ -101,7 +102,7 @@ cellIds, unused = zip(*list(allCells.items()))
 idx = 0
 for data in allCells.items():
     plot.plot([item[0] for item in data[1]], [item[1] for item in data[1]])
-    legend.append('Cell: ' + data[0])
+    #legend.append('Cell: ' + data[0])
     if not data[0] in ids:
         ids.append(cellIds[idx])
         x.append(unused[idx][0][0])
@@ -109,7 +110,7 @@ for data in allCells.items():
         idx += 1
 for i in range(len(ids)):
     plot.scatter(x[i], y[i])
-    plot.text(x[i], y[i], ids[i])
+    #plot.text(x[i], y[i], ids[i])
 
 plot.title('Wykres zmian świecenia w czasie (wszystkie komórki)')
 plot.ylabel('wartość świecenia')
