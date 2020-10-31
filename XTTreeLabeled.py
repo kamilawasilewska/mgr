@@ -15,8 +15,8 @@ CELL_LINE_NUMBER = 1
 CELL_GENERATIONS = 2
 CELL_TIME_SLICE = 3
 CELL_LABEL = 4
-CELLS_LABELED_TOTAL = 5
-CELL_DIVIDED = 6
+CELL_DIVIDED = 5
+CELL_TIME_SINCE_PREVIOUS_DIVISION = 6
 
 
 def XTTreeLabeled(imarisId):
@@ -76,7 +76,7 @@ def extractUniqueData(edges):
 
 def prepareTableWithData(dataExtracted, generations, timeIndex, timeSincePreviousDivision):
     """
-   :return [...[CELL_ID, CELL_LINE_NUMBER, CELL_GENERATIONS, CELL_TIME_SLICE, CELL_LABEL, CELLS_LABELED_TOTAL, CELL_DIVIDED]]
+   :return [...[CELL_ID, CELL_LINE_NUMBER, CELL_GENERATIONS, CELL_TIME_SLICE, CELL_LABEL, CELL_DIVIDED]]
     """
     table = []
     for i in range(len(dataExtracted)):
@@ -101,11 +101,36 @@ def prepareTableWithData(dataExtracted, generations, timeIndex, timeSincePreviou
     for j in range(len(table)):
         for i in range(len(cellsAfterDivision)):
             if int(cellsAfterDivision[i][CELL_ID]) == table[j][CELL_ID]:
-                table[j][-1] = 1
+                table[j][CELL_DIVIDED] = 1
                 break
             else:
-                table[j][-1] = 0
+                table[j][CELL_DIVIDED] = 0
+    for j in range(len(table)):
+        for i in range(len(timeSincePreviousDivision)):
+            if int(timeSincePreviousDivision[i][CELL_ID]) == table[j][CELL_ID]:
+                table[j][CELL_TIME_SINCE_PREVIOUS_DIVISION] = round(float(timeSincePreviousDivision[i][2]))
+                break
+            else:
+                table[j][CELL_TIME_SINCE_PREVIOUS_DIVISION] = 0
     return table
+
+
+def rewriteCells(currentSliceCells, previousIteration):
+    assigned = []
+    for currentSliceCell in currentSliceCells:
+        for cell in previousIteration:
+            if cell[CELL_LINE_NUMBER] == currentSliceCell[CELL_LINE_NUMBER] \
+                    and cell[CELL_GENERATIONS] == currentSliceCell[CELL_GENERATIONS] \
+                    and cell[CELL_LABEL] not in assigned \
+                    and (
+                    cell[CELL_TIME_SINCE_PREVIOUS_DIVISION] == (currentSliceCell[CELL_TIME_SINCE_PREVIOUS_DIVISION] - 1)
+                    or (cell[CELL_GENERATIONS] == 0 and
+                        cell[CELL_TIME_SINCE_PREVIOUS_DIVISION] == 0 and cell[CELL_TIME_SINCE_PREVIOUS_DIVISION] == currentSliceCell[
+                            CELL_TIME_SINCE_PREVIOUS_DIVISION])
+            ):
+                currentSliceCell[CELL_LABEL] = cell[CELL_LABEL]
+                assigned.append(cell[CELL_LABEL])
+                break
 
 
 def createUniqueLabels(table):
@@ -113,148 +138,85 @@ def createUniqueLabels(table):
    labels unique cells and adds number for cell during division
    :return void
     """
+    previousIteration = []
     for timeSlice in range(int(max(table, key=lambda x: x[CELL_TIME_SLICE])[CELL_TIME_SLICE])):
         imarisTimeSlice = timeSlice + 1
         currentSliceCells = [cell for cell in table if int(cell[CELL_TIME_SLICE]) == imarisTimeSlice]
         currentSliceCells = sorted(currentSliceCells, key=lambda x: x[CELL_GENERATIONS])
+        currentSliceCells = sorted(currentSliceCells, key=lambda x: x[CELL_TIME_SINCE_PREVIOUS_DIVISION])
+        currentSliceCells = sorted(currentSliceCells, key=lambda x: x[CELL_DIVIDED])
+        print(imarisTimeSlice)
         if imarisTimeSlice == 1:
             initializeLabels(currentSliceCells)
             previousIteration = currentSliceCells
             continue
+        rewriteCells(currentSliceCells, previousIteration)
         for cell in currentSliceCells:
-            thisIterationSameLabelCells = [cell for cell in currentSliceCells if int(cell[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
-            # noinspection PyUnboundLocalVariable
-            prevIterationSameLabelCells = [cell for cell in previousIteration if int(cell[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
-
-            rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table)
-            if not (cell[CELL_LABEL] is None or cell[CELLS_LABELED_TOTAL] is None):
+            if cell[CELL_LABEL] is not None:
                 continue
-
-            try:
-                # noinspection PyUnboundLocalVariable
-                labeledCells
-            except NameError:
-                labeledCells = 0
-            try:
-                # noinspection PyUnboundLocalVariable
-                label
-            except NameError:
-                label = 1
-            if cell[CELL_DIVIDED] == 0:
-                labeledCells = rewriteFromAllLabeledCells(cell, imarisTimeSlice, labeledCells, table, thisIterationSameLabelCells)
-            if not (cell[CELL_LABEL] is None or cell[CELLS_LABELED_TOTAL] is None):
+            thisIterationSameLabelCells = [cellTmp for cellTmp in currentSliceCells if int(cellTmp[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
+            prevIterationSameLabelCells = [cellTmp for cellTmp in previousIteration if int(cellTmp[CELL_LINE_NUMBER]) == cell[CELL_LINE_NUMBER]]
+            if cell[CELL_DIVIDED] == 0 and cell[CELL_LABEL] is None:
+                rewriteFromAllLabeledCells(cell, table, thisIterationSameLabelCells, prevIterationSameLabelCells)
+            if cell[CELL_LABEL] is not None:
                 continue
-
-            label, labeledCells = createNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, label, labeledCells)
-        try:
-            del label, labeledCells
-        except NameError:
-            pass
+            createNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
+        notLabeled = [e for e in currentSliceCells if e[CELL_LABEL] is None]
+        if len(notLabeled) != 0:
+            print(notLabeled)
+            raise MissingLabelsException
         previousIteration = currentSliceCells
 
 
-def createNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, label, labeledCells):
-    if label is None or label > 2:
-        label = 1
-    prevIterationCell = getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
-    createLabel(cell, prevIterationCell, label)
-    cell[CELLS_LABELED_TOTAL] = labeledCells
-    labeledCells += 1
-    label += 1
-
-    return label, labeledCells
-
-
-def getParentCell(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
-    if len(prevIterationSameLabelCells) == CELL_LINE_NUMBER:
-        prevIterationCell = prevIterationSameLabelCells[CELL_ID]
-    else:
-        prevIterationCell = []
-        for item in prevIterationSameLabelCells:
-            if item[CELL_LINE_NUMBER] == cell[CELL_LINE_NUMBER] and item[CELL_GENERATIONS] != cell[CELL_GENERATIONS]:
-                prevIterationCell.append(item)
-
-    if not prevIterationCell:
-        prevIterationCell = findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIterationSameLabelCells)
-    elif len(prevIterationCell) > CELL_LINE_NUMBER:
-        for prev in prevIterationCell:
-            if not isinstance(prev, list):
-                break
-            if len(prev[CELL_LABEL].split(CELL_LABEL_DELIMITER)) - CELL_LINE_NUMBER == cell[CELL_GENERATIONS]:
-                prevIterationCell = prev
-                break
-    return prevIterationCell
-
-
-def rewriteFromAllLabeledCells(cell, imarisTimeSlice, labeledCells, table, thisIterationSameLabelCells):
-    tmp = allPreviouslyLabeledCells(imarisTimeSlice, table)
-    for labeledCell in tmp:
-        if labeledCell[CELL_LINE_NUMBER] == cell[CELL_LINE_NUMBER] \
-                and labeledCell[CELL_GENERATIONS] == cell[CELL_GENERATIONS] \
-                and not labeledCell[CELL_LABEL] in [item[CELL_LABEL] for item in thisIterationSameLabelCells]:
-            cell[CELL_LABEL] = labeledCell[CELL_LABEL]
-            cell[CELLS_LABELED_TOTAL] = labeledCells
-            labeledCells += 1
-            break
-    return labeledCells
-
-
-def findParentCell(prevIterationCell, prevIterationSameLabelCells, thisIterationSameLabelCells):
-    for thisIterationCell in thisIterationSameLabelCells:
-        for prev in prevIterationSameLabelCells:
-            if prev[CELL_GENERATIONS] != thisIterationCell[CELL_GENERATIONS] and prev[CELL_LABEL] not in [e[CELL_LABEL] for e in thisIterationSameLabelCells]:
-                prevIterationCell = prev
-                break
-        if prevIterationCell:
-            break
-    if not prevIterationCell:
-        for parentCell in prevIterationSameLabelCells:
-            if len([e[CELL_GENERATIONS] for e in thisIterationSameLabelCells if e[CELL_LABEL] == parentCell[CELL_LABEL]]) > 1:
-                continue
-
-            prevIterationCell = parentCell
-            break
-    return prevIterationCell
-
-
-def createLabel(cell, prevIterationCell, label):
-    if any(isinstance(i, list) for i in prevIterationCell):
-        prevIterationCell = prevIterationCell[CELL_ID]
-    newLabel = prevIterationCell[CELL_LABEL]
-    if len(str(newLabel).split('_')) - 1 < cell[CELL_GENERATIONS]:
-        newLabel += '_'
-        newLabel += str(label)
-        label += 1
+def createNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
+    newLabel = getNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells)
     cell[CELL_LABEL] = newLabel
-    return label
+
+
+def getNewLabel(cell, prevIterationSameLabelCells, thisIterationSameLabelCells):
+    usedLabels = [e[CELL_LABEL] for e in thisIterationSameLabelCells if e[CELL_LABEL]]
+    usedLabels.sort()
+    usedParents = list(set([e[:-2] for e in usedLabels]))
+    usedParents.sort()
+    parents = [p[CELL_LABEL] for p in prevIterationSameLabelCells if p[CELL_GENERATIONS] == (cell[CELL_GENERATIONS] - 1)]
+    for parent in parents:
+        if parent in usedLabels:
+            continue
+        candidate = parent + '_1'
+        if candidate not in usedLabels:
+            return candidate
+        candidate = parent + '_2'
+        if candidate not in usedLabels:
+            return candidate
+
+    print(cell)
+    raise UnableToFindLabelException
+
+
+def rewriteFromAllLabeledCells(cell, table, thisIterationSameLabelCells, previousIteration):
+    rewriteCells(thisIterationSameLabelCells, previousIteration)
+    notLabeled = [c for c in thisIterationSameLabelCells if c[CELL_LABEL] is None and c[CELL_DIVIDED] == 0]
+    if not notLabeled:
+        return
+    allLabeledCells = list(set([c[CELL_LABEL] for c in table if
+                                c[CELL_LABEL] and c[CELL_LINE_NUMBER] == cell[CELL_LINE_NUMBER] and c[CELL_GENERATIONS] == cell[CELL_GENERATIONS]]))
+    usedLabels = [item[CELL_LABEL] for item in thisIterationSameLabelCells]
+    for labeledCell in allLabeledCells:
+        if labeledCell not in usedLabels:
+            cell[CELL_LABEL] = labeledCell
+            break
 
 
 def initializeLabels(currentSliceCells):
     label = 1
     for cell in currentSliceCells:
         cell[CELL_LABEL] = str(label)
-        cell[CELLS_LABELED_TOTAL] = 1
         label += 1
 
 
-def allPreviouslyLabeledCells(imarisTimeSlice, table):
-    tmp = []
-    slice_length = len([cell for cell in table if cell[CELL_TIME_SLICE] < imarisTimeSlice]) - 1
-    for i in range(slice_length):
-        tmp.append(table[slice_length - i])
-    return tmp
+class UnableToFindLabelException(Exception):
+    pass
 
 
-def rewriteLabeledCells(cell, prevIterationSameLabelCells, thisIterationSameLabelCells, table):
-    if len(prevIterationSameLabelCells) != len(thisIterationSameLabelCells) and \
-            [cell[CELL_ID], cell[CELL_LINE_NUMBER], cell[CELL_GENERATIONS], cell[CELL_TIME_SLICE]] not in \
-            [
-                [element[CELL_ID], element[CELL_LINE_NUMBER], element[CELL_GENERATIONS], element[CELL_TIME_SLICE]]
-                for element in allPreviouslyLabeledCells(cell[CELL_TIME_SLICE], table)
-            ]:
-        return
-    for labeledCell in prevIterationSameLabelCells:
-        if not [labeledCell[CELL_LINE_NUMBER], labeledCell[CELL_LABEL]] in [[item[CELL_LINE_NUMBER], item[CELL_LABEL]] for item in thisIterationSameLabelCells]:
-            cell[CELL_LABEL] = labeledCell[CELL_LABEL]
-            cell[CELLS_LABELED_TOTAL] = labeledCell[CELLS_LABELED_TOTAL]
-            break
+class MissingLabelsException(Exception):
+    pass
