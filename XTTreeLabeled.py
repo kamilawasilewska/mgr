@@ -220,6 +220,3 @@ class UnableToFindLabelException(Exception):
 
 class MissingLabelsException(Exception):
     pass
-
-
-XTTreeLabeled(0)
